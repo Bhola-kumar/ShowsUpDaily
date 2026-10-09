@@ -25,7 +25,13 @@ class AuthError(Exception):
 
 
 def base_url():
-    return os.getenv("BASE_URL", "http://localhost:5000").rstrip("/")
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    base = os.getenv("BASE_URL")
+    if render_url and (not base or "localhost" in base):
+        return render_url.rstrip("/")
+    if base:
+        return base.rstrip("/")
+    return "http://localhost:5000"
 
 
 def redirect_uri():

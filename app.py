@@ -15,6 +15,7 @@ load_dotenv()
 from flask import (Flask, abort, flash, jsonify, redirect, render_template, request,  # noqa: E402
                    send_file, session, url_for)
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 import db  # noqa: E402
 import gemini  # noqa: E402
 import youtube  # noqa: E402
@@ -27,6 +28,7 @@ RETRY_GAP_MIN = 30
 db.init()
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 
 def _secret():
