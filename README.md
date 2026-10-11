@@ -28,15 +28,35 @@ OAUTHLIB_INSECURE_TRANSPORT=1 python app.py   # http://localhost:5000
 4. Copy the client ID and secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 5. **Important:** on the consent screen, click **Publish app** (move it from "Testing" to "In production"). In Testing mode Google expires the login after 7 days and daily posting stops. You'll see an "unverified app" warning when signing in, which is fine for your own account.
 
-## Deploy on a free host
+## Deploy on a free host & Persistent Storage
 
-Free hosts differ, and two things matter: the **disk must persist** (your video, the login token and the counter live in `DATA_DIR`) and the **app must be awake** at post time.
+Free hosts (like Render, Railway, Heroku, etc.) usually wipe their local disk on every restart and new deployment. To ensure your **uploaded videos, YouTube tokens, streak counts, and settings are never lost**, you can connect a free Supabase instance.
 
-- **Always-on process with a persistent disk:** start with `gunicorn app:app --workers 1 --threads 4 --timeout 900` (see `Procfile`). Keep it at **one worker**, since the scheduler runs inside it. Point `DATA_DIR` at the persistent volume.
-- **Hosts that sleep when idle** (many free web tiers): set `CRON_KEY` and have a free pinger such as cron-job.org call `https://YOUR-APP/cron/tick?key=YOUR_CRON_KEY` every 10–15 minutes. The ping wakes the app, and it posts once per day when the scheduled time has passed. Without a persistent disk on these hosts, a restart erases the uploaded video and login, so you'd have to re-upload and reconnect.
-- **Hosts with only a daily scheduled task** (e.g. PythonAnywhere): schedule `python run_daily.py` and it will post if it's due. Check that the host allows outbound calls to Google's APIs on the free plan.
+### Option A: Persistent Cloud Storage with Supabase (Recommended)
 
-Set `BASE_URL` to the public https address and add it to the Google redirect URI list. Set `TZ_NAME` for your time zone.
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Go to **SQL Editor** -> **New Query**, paste the contents of `supabase_schema.sql`, and click **Run**.
+3. In your host's environment variables (or `.env`), set:
+   - `SUPABASE_URL`: `https://YOUR-PROJECT-REF.supabase.co`
+   - `SUPABASE_KEY`: Your project's `service_role` secret key (**Project Settings** -> **API** -> **Project API keys** -> `service_role`).
+   - `SUPABASE_BUCKET`: `videos` (created automatically by the SQL script).
+4. That's it! Your video files are stored in Supabase Storage, and all database state lives in Supabase PostgreSQL. On every redeploy or container restart, the app automatically restores files from Supabase.
+
+#### Supabase Free Tier Notes:
+- **Inactivity / Auto-pause:** Supabase free projects pause if they receive no database queries for 7 days. Because Daily Poster runs every day (and any ping to `/healthz` or `/cron/tick` performs a database keep-alive check), your project **stays active automatically**.
+- **File size limit:** Supabase Free tier allows up to **50 MB per upload** (1 GB total). Perfect for daily YouTube Shorts, reels, and clips.
+
+### Option B: Local Disk (Only if your host provides persistent volumes)
+
+If your host supports persistent storage volumes (e.g. Render Persistent Disk, Railway Volume), point `DATA_DIR` to your mounted volume and leave `SUPABASE_URL` blank.
+
+### Keeping the app awake
+
+- **Always-on process:** start with `gunicorn app:app --workers 1 --threads 4 --timeout 900` (see `Procfile`). Keep it at **one worker**, since the scheduler runs inside it.
+- **Hosts that sleep when idle** (free web tiers): set `CRON_KEY` and have a free pinger such as [cron-job.org](https://cron-job.org) or UptimeRobot call `https://YOUR-APP/cron/tick?key=YOUR_CRON_KEY` every 10–15 minutes. The ping wakes the app, resets Supabase's inactivity timer, and posts once per day when the scheduled time has passed.
+- **Hosts with only a daily scheduled task** (e.g. PythonAnywhere): schedule `python run_daily.py`.
+
+Set `BASE_URL` to your public https address and add it to the Google redirect URI list (`BASE_URL/oauth/callback`). Set `TZ_NAME` for your time zone.
 
 ## Behavior to know
 

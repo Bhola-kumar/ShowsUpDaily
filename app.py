@@ -35,10 +35,23 @@ def _secret():
     s = os.getenv("SECRET_KEY")
     if s:
         return s
+    saved = db.get("flask_secret_key")
+    if saved:
+        return saved
     p = db.DATA / ".secret_key"
-    if not p.exists():
-        p.write_text(secrets.token_hex(32))
-    return p.read_text().strip()
+    if p.exists():
+        key = p.read_text().strip()
+    else:
+        key = secrets.token_hex(32)
+        try:
+            p.write_text(key)
+        except Exception:
+            pass
+    try:
+        db.put("flask_secret_key", key)
+    except Exception:
+        pass
+    return key
 
 
 app.config.update(
@@ -65,7 +78,7 @@ def stamp():
 
 def active_video():
     vid = db.get("active_video_id")
-    return db.one("SELECT * FROM videos WHERE id=?", (vid,)) if vid else None
+    return db.get_video(vid) if vid else None
 
 
 def login_required(f):
@@ -96,9 +109,7 @@ _run_lock = threading.Lock()
 
 
 def _previous_descriptions(video_id, n=3):
-    rows = db.q("SELECT description FROM posts WHERE video_id=? AND status='ok' ORDER BY id DESC LIMIT ?",
-                (video_id, n))
-    return [r["description"] for r in rows]
+    return db.previous_descriptions(video_id, n)
 
 
 def run_post():
@@ -110,15 +121,16 @@ def run_post():
         v = active_video()
         if not v:
             return "No active video."
-        path = db.VIDEOS / v["filename"]
-        if not path.exists():
+        path = db.ensure_video_file(v["filename"])
+        if not path or not path.exists():
             raise RuntimeError("Video file is missing on the server (was the disk reset?). Upload it again.")
-        day_no = v["days_posted"] + 1
+        day_no = (v["days_posted"] or 0) + 1
         notes_out = []
+        notes_val = v["notes"] if "notes" in v and v["notes"] else ""
         try:
-            meta = gemini.generate(v["title"], v["notes"], day_no, _previous_descriptions(v["id"]))
+            meta = gemini.generate(v["title"], notes_val, day_no, _previous_descriptions(v["id"]))
         except Exception as e:  # post anyway with plain metadata
-            meta = gemini.fallback(v["title"], v["notes"])
+            meta = gemini.fallback(v["title"], notes_val)
             notes_out.append(f"Gemini unavailable, used plain description ({e})")
         creds = youtube.get_creds()
         privacy = db.get("privacy", "public")
@@ -127,17 +139,28 @@ def run_post():
         if res["privacy"] != privacy:
             notes_out.append(f"YouTube set it to {res['privacy']} (asked for {privacy}). "
                              "Unaudited API projects are forced to private, see README.")
-        db.x("UPDATE videos SET days_posted=days_posted+1, first_post_date=COALESCE(first_post_date,?) WHERE id=?",
-             (today(), v["id"]))
-        db.x("INSERT INTO posts(video_id,day_no,posted_at,status,youtube_id,privacy,message,description,tags) "
-             "VALUES(?,?,?,?,?,?,?,?,?)",
-             (v["id"], day_no, stamp(), "ok", res["id"], res["privacy"], " ".join(notes_out),
-              meta["description"], ", ".join(meta["tags"])))
+        db.increment_video_days(v["id"], today())
+        db.create_post(
+            video_id=v["id"],
+            day_no=day_no,
+            posted_at=stamp(),
+            status="ok",
+            youtube_id=res["id"],
+            privacy=res["privacy"],
+            message=" ".join(notes_out),
+            description=meta["description"],
+            tags=", ".join(meta["tags"])
+        )
         db.put("last_post_date", today())
         return f"Posted day {day_no}: https://youtu.be/{res['id']}"
     except Exception as e:
-        db.x("INSERT INTO posts(video_id,day_no,posted_at,status,message) VALUES(?,?,?,?,?)",
-             (v["id"] if v else None, (v["days_posted"] + 1) if v else None, stamp(), "error", str(e)[:500]))
+        db.create_post(
+            video_id=v["id"] if v else None,
+            day_no=((v["days_posted"] or 0) + 1) if v else None,
+            posted_at=stamp(),
+            status="error",
+            message=str(e)[:500]
+        )
         return f"Failed: {e}"
     finally:
         _run_lock.release()
@@ -217,9 +240,9 @@ def _next_run_label():
 @login_required
 def index():
     v = active_video()
-    others = db.q("SELECT * FROM videos WHERE id != ? ORDER BY id DESC", (v["id"] if v else -1,))
-    posts = db.q("SELECT * FROM posts ORDER BY id DESC LIMIT 8")
-    last_ok = db.one("SELECT posted_at FROM posts WHERE status='ok' ORDER BY id DESC LIMIT 1")
+    others = db.list_videos(exclude_id=v["id"] if v else None)
+    posts = db.list_posts(limit=8)
+    last_ok = db.last_successful_post()
     return render_template(
         "index.html", v=v, others=others, posts=posts,
         connected=bool(db.get("google_token")), oauth_ready=youtube.configured(),
@@ -227,7 +250,8 @@ def index():
         enabled=db.get("enabled", "1") == "1", privacy=db.get("privacy", "public"),
         next_run=_next_run_label(), last_post=last_ok["posted_at"] if last_ok else None,
         tz=str(TZ), gemini_ready=bool(os.getenv("GEMINI_API_KEY")),
-        running=_run_lock.locked())
+        running=_run_lock.locked(),
+        supabase_ready=db.is_supabase())
 
 
 @app.post("/settings")
@@ -280,8 +304,16 @@ def upload():
     name = uuid.uuid4().hex + ext
     path = db.VIDEOS / name
     f.save(path)
-    vid = db.x("INSERT INTO videos(filename,original_name,title,notes,uploaded_at,size_bytes) VALUES(?,?,?,?,?,?)",
-               (name, f.filename, title, notes, stamp(), path.stat().st_size))
+    try:
+        db.save_video_file(name, path)
+    except Exception as e:
+        try:
+            path.unlink()
+        except Exception:
+            pass
+        flash(f"Upload failed: {e}", "err")
+        return redirect(url_for("index"))
+    vid = db.create_video(name, f.filename, title, notes, stamp(), path.stat().st_size)
     db.put("active_video_id", vid)
     flash("New video is active. Day counter restarted; it posts at the next scheduled time.", "ok")
     return redirect(url_for("index"))
@@ -290,16 +322,19 @@ def upload():
 @app.get("/video/<int:vid>")
 @login_required
 def video_file(vid):
-    v = db.one("SELECT * FROM videos WHERE id=?", (vid,))
-    if not v or not (db.VIDEOS / v["filename"]).exists():
+    v = db.get_video(vid)
+    if not v:
         abort(404)
-    return send_file(db.VIDEOS / v["filename"], conditional=True)
+    path = db.ensure_video_file(v["filename"])
+    if not path or not path.exists():
+        abort(404)
+    return send_file(path, conditional=True)
 
 
 @app.post("/video/<int:vid>/resume")
 @login_required
 def resume(vid):
-    v = db.one("SELECT * FROM videos WHERE id=?", (vid,))
+    v = db.get_video(vid)
     if not v:
         abort(404)
     db.put("active_video_id", vid)
@@ -310,15 +345,12 @@ def resume(vid):
 @app.post("/video/<int:vid>/delete")
 @login_required
 def delete_video(vid):
-    v = db.one("SELECT * FROM videos WHERE id=?", (vid,))
-    if not v or str(vid) == db.get("active_video_id"):
+    v = db.get_video(vid)
+    if not v or str(vid) == str(db.get("active_video_id")):
         flash("Can't delete the active video.", "err")
         return redirect(url_for("index"))
-    try:
-        (db.VIDEOS / v["filename"]).unlink()
-    except FileNotFoundError:
-        pass
-    db.x("DELETE FROM videos WHERE id=?", (vid,))
+    db.delete_video_file(v["filename"])
+    db.delete_video(vid)
     flash("Deleted.", "ok")
     return redirect(url_for("index"))
 
@@ -366,13 +398,18 @@ def cron_tick():
     key = os.getenv("CRON_KEY", "")
     if not key or not hmac.compare_digest(request.args.get("key", ""), key):
         abort(404)
+    db.ping()
     threading.Thread(target=tick, daemon=True).start()
     return jsonify(ok=True)
 
 
 @app.get("/healthz")
 def healthz():
-    return "ok"
+    db_ok = db.ping()
+    return jsonify(
+        status="ok" if db_ok else "db_warning",
+        storage="supabase" if db.is_supabase() else "local"
+    )
 
 
 if __name__ == "__main__":

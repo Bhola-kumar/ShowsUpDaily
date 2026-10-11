@@ -3,6 +3,9 @@
 <header>
   <h1>Daily Poster</h1>
   <div class="pill">
+    {% if supabase_ready %}
+      <span class="dot on" style="background:#24b47e" title="Connected to Supabase persistent database and storage"></span><span style="color:var(--text);font-weight:600">Supabase</span>
+    {% endif %}
     {% if connected %}
       <span class="dot on"></span><strong>{{ channel or 'Connected' }}</strong>
       <form class="inline" method="post" action="{{ url_for('disconnect') }}"
