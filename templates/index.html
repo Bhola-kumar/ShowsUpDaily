@@ -1,138 +1,404 @@
 {% extends "base.html" %}
 {% block body %}
+
+<!-- 1. Header with System Status Indicators -->
 <header>
-  <h1>Daily Poster</h1>
-  <div class="pill">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+    </div>
+    <div>
+      <div class="brand-title">Daily Poster</div>
+      <div class="muted" style="font-size:12px">ShowsUpDaily Automation</div>
+    </div>
+  </div>
+
+  <div class="status-cluster">
     {% if supabase_ready %}
-      <span class="dot on" style="background:#24b47e" title="Connected to Supabase persistent database and storage"></span><span style="color:var(--text);font-weight:600">Supabase</span>
-    {% endif %}
-    {% if connected %}
-      <span class="dot on"></span><strong>{{ channel or 'Connected' }}</strong>
-      <form class="inline" method="post" action="{{ url_for('disconnect') }}"
-            onsubmit="return confirm('Disconnect this channel?')">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" type="submit">Disconnect</button>
-      </form>
+      <span class="badge badge-success" title="Persistent PostgreSQL & Video Storage connected">
+        <span class="dot on pulse"></span>Supabase Cloud Synced
+      </span>
     {% else %}
-      <span class="dot"></span><span class="muted">No channel connected</span>
-      <a class="btn primary" href="{{ url_for('connect') }}">Connect YouTube</a>
+      <span class="badge" title="Running in local file mode">
+        <span class="dot"></span>Local Storage
+      </span>
     {% endif %}
+
+    {% if gemini_ready %}
+      <span class="badge badge-purple" title="Gemini AI multi-model engine active">
+        ✦ Gemini AI Ready
+      </span>
+    {% else %}
+      <span class="badge" title="Add GEMINI_API_KEY for AI descriptions">
+        Plain Mode (No AI Key)
+      </span>
+    {% endif %}
+
+    {% if connected %}
+      <div class="badge badge-blue">
+        <span class="dot on"></span>
+        <strong>{{ channel or 'Connected' }}</strong>
+        <form class="inline" method="post" action="{{ url_for('disconnect') }}" onsubmit="return confirm('Disconnect this YouTube channel?')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="link" type="submit" style="color:inherit;margin-left:4px;opacity:0.8" title="Disconnect channel">✕</button>
+        </form>
+      </div>
+    {% else %}
+      {% if oauth_ready %}
+        <a class="btn primary" href="{{ url_for('connect') }}" style="padding:6px 12px;font-size:12.5px">Connect YouTube</a>
+      {% else %}
+        <span class="badge" style="color:var(--warn)">OAuth Missing</span>
+      {% endif %}
+    {% endif %}
+
     <form class="inline" method="post" action="{{ url_for('logout') }}">
-      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" type="submit">Sign out</button>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn" type="submit" style="padding:6px 12px;font-size:12.5px">Sign out</button>
     </form>
   </div>
 </header>
 
 {% if not connected and not oauth_ready %}
-  <div class="flash err">Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment to enable YouTube connection.</div>
-{% endif %}
-{% if not gemini_ready %}
-  <div class="flash">GEMINI_API_KEY isn't set, so plain descriptions will be used instead of AI-written ones.</div>
+  <div class="flash err">
+    <span>⚠️</span>
+    <div>Add <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> to your environment to connect your YouTube channel.</div>
+  </div>
 {% endif %}
 
-<div class="stats">
-  <div class="stat">
-    <div class="k">Posting streak</div>
-    <div class="v">{% if v and v.days_posted %}Day {{ v.days_posted }}{% else %}Not started{% endif %}</div>
-    <div class="s">{% if v and v.first_post_date %}since {{ v.first_post_date }}{% else %}&nbsp;{% endif %}</div>
+<!-- 2. Command Center Overview Strip -->
+<div class="metrics-grid">
+  <div class="metric-card flame">
+    <div class="metric-header">
+      <span>POSTING STREAK</span>
+      <span>🔥</span>
+    </div>
+    <div class="metric-value">
+      {% if v and v.days_posted %}Day {{ v.days_posted }}{% else %}Day 0{% endif %}
+    </div>
+    <div class="metric-sub">
+      {% if v and v.first_post_date %}Started on {{ v.first_post_date }}{% else %}Ready for Day 1 upload{% endif %}
+    </div>
   </div>
-  <div class="stat">
-    <div class="k">Next post</div>
-    <div class="v">{{ next_run }}</div>
-    <div class="s">{{ tz }}</div>
+
+  <div class="metric-card clock">
+    <div class="metric-header">
+      <span>NEXT SCHEDULED RUN</span>
+      <span>⏰</span>
+    </div>
+    <div class="metric-value" style="font-size:22px">
+      {{ next_run }}
+    </div>
+    <div class="metric-sub">
+      <span>{{ tz }}</span> · <span>{{ 'Daily active' if enabled else 'Paused' }}</span>
+    </div>
   </div>
-  <div class="stat">
-    <div class="k">Last post</div>
-    <div class="v" style="font-size:18px;padding-top:4px">{{ last_post or '—' }}</div>
-    <div class="s">{% if running %}posting now…{% else %}&nbsp;{% endif %}</div>
+
+  <div class="metric-card check">
+    <div class="metric-header">
+      <span>LAST POST RESULT</span>
+      <span>🚀</span>
+    </div>
+    <div class="metric-value" style="font-size:20px">
+      {{ last_post or 'No posts yet' }}
+    </div>
+    <div class="metric-sub">
+      {% if running %}
+        <span style="color:var(--warn)">Posting in progress right now…</span>
+      {% else %}
+        <span>Automated daily runner</span>
+      {% endif %}
+    </div>
   </div>
 </div>
 
+<!-- 3. Daily Posting Schedule Configuration -->
 <section class="card">
-  <h2>Schedule</h2>
+  <div class="card-header">
+    <h2 class="card-title">
+      <span class="icon">⚙️</span> Automation &amp; Schedule Settings
+    </h2>
+    <span class="muted" style="font-size:12px">Controls when and how the daily post publishes</span>
+  </div>
   <form method="post" action="{{ url_for('settings') }}" class="row">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div><label for="t">Post daily at</label><input id="t" type="time" name="post_time" value="{{ post_time }}" required></div>
-    <div><label for="p">Visibility</label>
+    <div style="flex:1 1 160px">
+      <label for="t">Post Daily At</label>
+      <input id="t" type="time" name="post_time" value="{{ post_time }}" required>
+    </div>
+    <div style="flex:1 1 160px">
+      <label for="p">Visibility Mode</label>
       <select id="p" name="privacy">
-        {% for o in ['public','unlisted','private'] %}<option value="{{ o }}" {{ 'selected' if o == privacy }}>{{ o|capitalize }}</option>{% endfor %}
-      </select></div>
-    <div><label class="check"><input type="checkbox" name="enabled" {{ 'checked' if enabled }}> Enabled</label></div>
-    <div style="flex:0 0 auto"><button class="primary" type="submit">Save</button></div>
+        {% for o in ['public','unlisted','private'] %}
+          <option value="{{ o }}" {{ 'selected' if o == privacy }}>{{ o|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex:1 1 160px;padding-bottom:10px">
+      <label class="check" style="cursor:pointer">
+        <input type="checkbox" name="enabled" {{ 'checked' if enabled }}>
+        <span>Automation Enabled</span>
+      </label>
+    </div>
+    <div style="flex:0 0 auto">
+      <button class="primary" type="submit">Save Settings</button>
+    </div>
   </form>
 </section>
 
-<section class="card">
-  <h2>Video</h2>
+<!-- 4. Currently Active Video -->
+<section class="card" style="border-color:rgba(59, 130, 246, 0.35)">
+  <div class="card-header">
+    <h2 class="card-title">
+      <span class="icon">⭐</span> Current Active Video
+    </h2>
+    {% if v %}
+      <span class="badge badge-success">
+        <span class="dot on"></span> Ready for Daily Posting (Streak Day {{ (v.days_posted or 0) + 1 }})
+      </span>
+    {% else %}
+      <span class="badge" style="color:var(--warn)">No Video Set</span>
+    {% endif %}
+  </div>
+
   {% if v %}
-    <video controls preload="metadata" src="{{ url_for('video_file', vid=v.id) }}"></video>
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px">
+    <!-- Video Player Preview -->
+    <div class="video-container">
+      <video controls preload="metadata" src="{{ url_for('video_file', vid=v.id) }}"></video>
+    </div>
+
+    <!-- Active Video Details & Metadata -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px">
       <div>
-        <strong>{{ v.title }}</strong>
-        <div class="muted">{{ v.original_name }} · {{ '%.1f'|format(v.size_bytes / 1048576) }} MB · {{ v.days_posted }} post{{ '' if v.days_posted == 1 else 's' }}</div>
+        <h3 style="margin:0 0 4px;font-size:18px;font-weight:800;color:#fff">{{ v.title }}</h3>
+        <div class="muted">
+          <span class="mono">{{ v.original_name }}</span> · {{ '%.1f'|format(v.size_bytes / 1048576) }} MB · 
+          <strong>{{ v.days_posted }}</strong> post{{ '' if v.days_posted == 1 else 's' }} recorded
+        </div>
       </div>
-      <form method="post" action="{{ url_for('run_now') }}" onsubmit="return confirm('Post this video to YouTube right now?')">
+
+      <!-- Action Button Area -->
+      <form method="post" action="{{ url_for('run_now') }}" onsubmit="return confirm('Generate fresh AI description & tags and post this video to YouTube right now?')">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit" {{ 'disabled' if running }}>Post now</button>
+        <button class="btn-hero" type="submit" {{ 'disabled' if running }}>
+          {% if running %}
+            <span>⏳ Posting to YouTube now…</span>
+          {% else %}
+            <span>🚀 Post to YouTube Now</span>
+          {% endif %}
+        </button>
       </form>
     </div>
-    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-  {% endif %}
-  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="stack"
-        onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Uploading…'">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div><label for="f">{{ 'Replace with a new video' if v else 'Upload your video' }}</label>
-      <input id="f" type="file" name="video" accept="video/*" required></div>
-    <div class="row">
-      <div style="flex:2 1 240px"><label for="ti">Title</label><input id="ti" type="text" name="title" maxlength="100" required></div>
+
+    <!-- Notes Context Box for Gemini -->
+    {% if v.notes %}
+      <div style="background:var(--card-inner);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:12px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:4px">
+          Context used by Gemini AI for Daily Variations:
+        </div>
+        <div style="font-size:13.5px;color:var(--ink);white-space:pre-wrap">{{ v.notes }}</div>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <div style="text-align:center;padding:36px 20px;background:var(--card-inner);border-radius:var(--radius-md);border:1px dashed var(--border)">
+      <div style="font-size:32px;margin-bottom:12px">🎬</div>
+      <h3 style="margin:0 0 6px">No video uploaded yet</h3>
+      <p class="muted" style="margin:0 0 16px;max-width:420px;margin-inline:auto">Upload your video below. ShowsUpDaily will automatically post it every day and craft unique AI descriptions &amp; tags.</p>
     </div>
-    <div><label for="n">What's it about? <span class="muted">(helps Gemini write the description and tags)</span></label>
-      <textarea id="n" name="notes" maxlength="1500"></textarea></div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <button class="primary" type="submit">Upload</button>
-      {% if v %}<span class="muted">A new video restarts the day counter. Earlier videos stay below so you can resume them.</span>{% endif %}
+  {% endif %}
+</section>
+
+<!-- 5. Upload New Video / Replace Active Video (Clean, Dedicated Workflow) -->
+<section class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <span class="icon">📁</span> {{ 'Replace Active Video or Upload New' if v else 'Upload Your Video' }}
+    </h2>
+    {% if v %}
+      <span class="muted" style="font-size:12.5px">Uploading a new video sets it active and starts Day 1</span>
+    {% endif %}
+  </div>
+
+  {% if v %}
+    <!-- Accordion toggle when a video already exists so it doesn't clutter the page -->
+    <details class="accordion">
+      <summary>
+        <span>+ Click here to upload a new video</span>
+        <span class="muted" style="font-size:12px">Opens upload form</span>
+      </summary>
+      <div class="accordion-content">
+  {% endif %}
+
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="stack"
+        onsubmit="this.querySelector('button[type=submit]').disabled=true;this.querySelector('button[type=submit]').textContent='Uploading to Cloud…'">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    
+    <div>
+      <label for="f">Video File</label>
+      <label class="dropzone" for="f">
+        <input id="f" type="file" name="video" accept="video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm,video/x-msvideo" required
+               onchange="if(this.files[0]) document.getElementById('file-chosen-name').textContent = this.files[0].name + ' (' + (this.files[0].size/1048576).toFixed(1) + ' MB)';">
+        <div style="font-size:24px;margin-bottom:6px">📤</div>
+        <div id="file-chosen-name" style="font-weight:600;color:var(--ink)">Choose a video file or click to browse</div>
+        <div class="muted" style="font-size:12px;margin-top:4px">Supports MP4, MOV, MKV, WEBM, M4V, AVI</div>
+      </label>
+    </div>
+
+    <div>
+      <label for="ti">Video Title</label>
+      <input id="ti" type="text" name="title" maxlength="100" placeholder="e.g. I Show Up Daily" required>
+    </div>
+
+    <div>
+      <label for="n">What is this video about? <span class="muted">(Helps Gemini generate unique descriptions &amp; tags daily)</span></label>
+      <textarea id="n" name="notes" maxlength="1500" placeholder="e.g. This is about showing up daily to post content, staying consistent, and testing channel growth..."></textarea>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <button class="primary" type="submit" style="padding:11px 22px;font-size:14px">Upload &amp; Set as Active Video</button>
+      {% if v %}
+        <span class="muted" style="font-size:12.5px">Your earlier video will remain archived below so you can switch back anytime.</span>
+      {% endif %}
     </div>
   </form>
+
+  {% if v %}
+      </div>
+    </details>
+  {% endif %}
 </section>
 
+<!-- 6. Video Library / Archive ("Earlier Videos") -->
 {% if others %}
 <section class="card">
-  <h2>Earlier videos</h2>
-  {% for o in others %}
-  <div class="list-item">
-    <div><strong>{{ o.title }}</strong>
-      <div class="muted">{{ o.days_posted }} post{{ '' if o.days_posted == 1 else 's' }} · uploaded {{ o.uploaded_at }}</div></div>
-    <div class="actions">
-      <form method="post" action="{{ url_for('resume', vid=o.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit">Resume at day {{ o.days_posted }}</button></form>
-      <form method="post" action="{{ url_for('delete_video', vid=o.id) }}" onsubmit="return confirm('Delete this video file?')">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" type="submit">Delete</button></form>
-    </div>
+  <div class="card-header">
+    <h2 class="card-title">
+      <span class="icon">📚</span> Video Library (Earlier Uploads)
+    </h2>
+    <span class="muted" style="font-size:12.5px">Saved in your persistent storage</span>
   </div>
-  {% endfor %}
+
+  <div>
+    {% for o in others %}
+    <div class="video-item">
+      <div>
+        <div class="video-meta-title">{{ o.title }}</div>
+        <div class="video-meta-sub">
+          <span class="mono">{{ o.original_name }}</span> · 
+          {{ '%.1f'|format(o.size_bytes / 1048576) }} MB · 
+          <strong>{{ o.days_posted }}</strong> post{{ '' if o.days_posted == 1 else 's' }} · 
+          Uploaded {{ o.uploaded_at }}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <form method="post" action="{{ url_for('resume', vid=o.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="primary" style="padding:7px 12px;font-size:12.5px">
+            Make Active (Day {{ o.days_posted }})
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('delete_video', vid=o.id) }}" onsubmit="return confirm('Permanently delete this video from storage?')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="danger" style="padding:7px 12px;font-size:12.5px">
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
 </section>
 {% endif %}
 
+<!-- 7. Activity Log & AI Publishing History -->
 {% if posts %}
 <section class="card">
-  <h2>Activity</h2>
-  <table>
-    <tr><th>When</th><th>Day</th><th>Result</th></tr>
-    {% for p in posts %}
-    <tr>
-      <td>{{ p.posted_at }}</td>
-      <td>{{ p.day_no or '—' }}</td>
-      <td>
-        {% if p.status == 'ok' %}
-          <span class="ok">Posted</span> · <a href="https://youtu.be/{{ p.youtube_id }}" target="_blank" rel="noopener">watch</a> · {{ p.privacy }}
-          {% if p.message %}<div class="warn muted">{{ p.message }}</div>{% endif %}
-          <details><summary>Description &amp; tags</summary><p>{{ p.description }}</p><p>{{ p.tags }}</p></details>
-        {% else %}
-          <span class="err">Failed</span><div class="muted">{{ p.message }}</div>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="card-header">
+    <h2 class="card-title">
+      <span class="icon">📜</span> Publishing History &amp; AI Log
+    </h2>
+    <span class="muted" style="font-size:12.5px">Recent automated and manual posts</span>
+  </div>
+
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Published At</th>
+          <th>Streak</th>
+          <th>Status</th>
+          <th>YouTube Link</th>
+          <th>AI Metadata &amp; Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in posts %}
+        <tr>
+          <td class="mono" style="white-space:nowrap">{{ p.posted_at }}</td>
+          <td>
+            {% if p.day_no %}
+              <span class="badge" style="background:var(--warn-bg);border-color:rgba(245,158,11,0.3);color:var(--warn)">
+                Day {{ p.day_no }}
+              </span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.status == 'ok' %}
+              <span class="badge badge-success">✓ Published</span>
+            {% else %}
+              <span class="badge" style="background:var(--err-bg);border-color:var(--err-border);color:var(--err)">✕ Failed</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.youtube_id %}
+              <a href="https://youtu.be/{{ p.youtube_id }}" target="_blank" rel="noopener" class="badge badge-blue" style="text-decoration:none">
+                Watch ↗
+              </a>
+              <span class="muted" style="font-size:11.5px;margin-left:4px">({{ p.privacy }})</span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.message %}
+              <div style="font-size:12px;color:var(--warn);margin-bottom:6px">ℹ {{ p.message }}</div>
+            {% endif %}
+
+            {% if p.description or p.tags %}
+              <details style="cursor:pointer">
+                <summary style="color:var(--accent);font-size:12.5px;font-weight:600">
+                  View Generated Description &amp; Tags
+                </summary>
+                <div style="margin-top:8px;padding:10px 12px;background:var(--card-inner);border:1px solid var(--border);border-radius:var(--radius-sm)">
+                  {% if p.description %}
+                    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:3px">Description:</div>
+                    <div style="font-size:12.5px;white-space:pre-wrap;color:var(--ink);line-height:1.5">{{ p.description }}</div>
+                  {% endif %}
+
+                  {% if p.tags %}
+                    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-top:10px;margin-bottom:3px">Tags:</div>
+                    <div class="tags-wrap">
+                      {% for tag in p.tags.split(',') %}
+                        {% if tag.strip() %}
+                          <span class="tag-chip">#{{ tag.strip() }}</span>
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </details>
+            {% else %}
+              <span class="muted" style="font-size:12px">No metadata details</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endif %}
+
 {% endblock %}

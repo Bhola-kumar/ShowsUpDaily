@@ -1,13 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Sign in · Daily Poster{% endblock %}
+{% block title %}Sign In · ShowsUpDaily{% endblock %}
 {% block body %}
-<div style="max-width:340px;margin:12vh auto 0">
-  <h1 style="margin-bottom:16px">Daily Poster</h1>
-  <form method="post" class="card stack">
+<div style="max-width:380px;margin:12vh auto 0">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="display:inline-flex;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg, #ff0033 0%, #cc0029 100%);align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(255, 0, 51, 0.35);margin-bottom:12px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+    </div>
+    <h1 style="font-size:22px;font-weight:800;margin:0 0 4px">ShowsUpDaily</h1>
+    <div class="muted" style="font-size:13px">Sign in to control daily YouTube posting</div>
+  </div>
+
+  <form method="post" class="card stack" style="box-shadow:0 12px 36px rgba(0,0,0,0.4)">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div><label for="password">Password</label>
-      <input id="password" type="password" name="password" autofocus required></div>
-    <button class="primary" type="submit" style="width:100%">Sign in</button>
+    <div>
+      <label for="password">Application Password</label>
+      <input id="password" type="password" name="password" placeholder="Enter APP_PASSWORD" autofocus required style="padding:12px 14px">
+    </div>
+    <button class="primary" type="submit" style="width:100%;padding:12px;font-size:14px;justify-content:center">
+      Sign In to Dashboard →
+    </button>
   </form>
 </div>
 {% endblock %}
