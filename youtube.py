@@ -121,3 +121,22 @@ def upload(creds, path, title, description, tags, privacy, category="22"):
     while resp is None:
         _, resp = req.next_chunk(num_retries=3)
     return {"id": resp["id"], "privacy": resp.get("status", {}).get("privacyStatus", privacy)}
+
+
+def update_video_metadata(creds, youtube_id, title, description, tags, category="22"):
+    yt = _yt(creds)
+    curr = yt.videos().list(part="snippet", id=youtube_id).execute()
+    items = curr.get("items", [])
+    if not items:
+        raise RuntimeError(f"Video {youtube_id} not found on YouTube.")
+    snippet = items[0]["snippet"]
+    snippet["title"] = title[:100]
+    snippet["description"] = description
+    snippet["tags"] = tags
+    if category:
+        snippet["categoryId"] = category
+    body = {
+        "id": youtube_id,
+        "snippet": snippet
+    }
+    return yt.videos().update(part="snippet", body=body).execute()

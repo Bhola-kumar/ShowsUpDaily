@@ -9,7 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.update(DATA_DIR=tempfile.mkdtemp(), APP_PASSWORD="pw", DISABLE_SCHEDULER="1",
-                  CRON_KEY="k", GEMINI_API_KEY="x", TZ_NAME="Asia/Kolkata")
+                  CRON_KEY="k", GEMINI_API_KEY="x", TZ_NAME="Asia/Kolkata",
+                  SUPABASE_URL="", SUPABASE_KEY="")
 
 import app as A  # noqa: E402
 import db  # noqa: E402

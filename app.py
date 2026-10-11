@@ -274,13 +274,16 @@ def settings():
 @app.post("/run-now")
 @login_required
 def run_now():
-    if not db.get("google_token"):
-        flash("Connect YouTube first.", "err")
-    elif not active_video():
-        flash("Upload a video first.", "err")
-    else:
-        threading.Thread(target=run_post, daemon=True).start()
-        flash("Posting started. Refresh in a minute to see the result.", "ok")
+    try:
+        if not db.get("google_token"):
+            flash("Connect YouTube first.", "err")
+        elif not active_video():
+            flash("Upload a video first.", "err")
+        else:
+            threading.Thread(target=run_post, daemon=True).start()
+            flash("Posting started. Refresh in a minute to see the result.", "ok")
+    except Exception as e:
+        flash(f"Could not trigger posting: {e}", "err")
     return redirect(url_for("index"))
 
 

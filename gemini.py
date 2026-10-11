@@ -6,8 +6,15 @@ import time
 
 import requests
 
-
 import db
+
+FALLBACK_MODELS = [
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash",
+]
 
 
 def _clean_tags(tags, limit=450):
@@ -41,11 +48,11 @@ def get_model():
         m = db.get("gemini_model")
     except Exception:
         m = None
-    m = m or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    m = m or os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
     m = m.strip().removeprefix("models/")
-    if m in ("gemini-2.5-flash", "gemini-1.5-flash-8b"):
-        return "gemini-3.8-flash"
-    return m or "gemini-3.8-flash"
+    if m in ("gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"):
+        return "gemini-flash-lite-latest"
+    return m or "gemini-flash-lite-latest"
 
 
 def get_language():
@@ -60,7 +67,7 @@ def generate(title, notes, day_no, previous):
     key = os.getenv("GEMINI_API_KEY", "")
     if not key:
         raise RuntimeError("GEMINI_API_KEY is not set")
-    model = get_model()
+    primary_model = get_model()
     lang = get_language()
     prev = "\n---\n".join(p[:600] for p in previous if p) or "(none yet)"
     prompt = f"""You write YouTube metadata for one video that the channel re-posts daily.
@@ -73,29 +80,37 @@ Earlier descriptions (say the same truthful things in clearly different wording)
 Write in {lang}. Return ONLY JSON: {{"description": "...", "tags": ["..."]}}
 Rules: description 80-180 words, natural and accurate to the title/notes, no invented claims, no links,
 end with exactly 3 relevant hashtags. 10-15 tags, each under 30 characters, no # symbol."""
-    body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.9, "responseMimeType": "application/json"}}
+    body = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.8, "responseMimeType": "application/json"}
+    }
+
+    # Model cascade: try user model first, then ultra-fast fallback models
+    models_to_try = [primary_model] + [m for m in FALLBACK_MODELS if m != primary_model]
     last = None
-    for attempt in range(3):
+
+    for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        try:
-            r = requests.post(url, headers={"x-goog-api-key": key}, json=body, timeout=60)
-            if r.status_code == 200:
-                data = r.json()
-                text = "".join(p.get("text", "") for p in
-                               (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
-                text = re.sub(r"^\s*```(?:json)?|```\s*$", "", text).strip()
-                parsed = json.loads(text)
-                desc = _clean_text(parsed.get("description"))
-                tags = _clean_tags(parsed.get("tags"))
-                if not desc:
-                    raise ValueError("empty description")
-                return {"description": desc, "tags": tags}
-            if r.status_code == 404 and model != "gemini-3.8-flash":
-                model = "gemini-3.8-flash"
-                continue
-            last = f"HTTP {r.status_code}: {r.text[:200]}"
-        except (requests.RequestException, ValueError) as e:
-            last = str(e)
-        time.sleep(3 * (attempt + 1))
-    raise RuntimeError(f"Gemini failed: {last}")
+        for attempt in range(2):
+            try:
+                r = requests.post(url, headers={"x-goog-api-key": key}, json=body, timeout=25)
+                if r.status_code == 200:
+                    data = r.json()
+                    text = "".join(p.get("text", "") for p in
+                                   (data.get("candidates") or [{}])[0].get("content", {}).get("parts", []))
+                    text = re.sub(r"^\s*```(?:json)?|```\s*$", "", text).strip()
+                    parsed = json.loads(text)
+                    desc = _clean_text(parsed.get("description"))
+                    tags = _clean_tags(parsed.get("tags"))
+                    if not desc:
+                        raise ValueError("empty description")
+                    return {"description": desc, "tags": tags}
+                last = f"{model} returned HTTP {r.status_code}: {r.text[:200]}"
+                # If model is unavailable (404) or overloaded (503), failover immediately to next model
+                if r.status_code in (404, 503):
+                    break
+            except (requests.RequestException, ValueError) as e:
+                last = f"{model} error: {e}"
+            time.sleep(1)
+
+    raise RuntimeError(f"Gemini failed across models: {last}")
