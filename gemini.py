@@ -7,6 +7,9 @@ import time
 import requests
 
 
+import db
+
+
 def _clean_tags(tags, limit=450):
     out, used, seen = [], 0, set()
     for t in tags if isinstance(tags, list) else []:
@@ -33,12 +36,32 @@ def fallback(title, notes):
     return {"description": desc, "tags": tags}
 
 
+def get_model():
+    try:
+        m = db.get("gemini_model")
+    except Exception:
+        m = None
+    m = m or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    m = m.strip().removeprefix("models/")
+    if m in ("gemini-2.5-flash", "gemini-1.5-flash-8b"):
+        return "gemini-3.8-flash"
+    return m or "gemini-3.8-flash"
+
+
+def get_language():
+    try:
+        lang = db.get("content_language")
+    except Exception:
+        lang = None
+    return lang or os.getenv("CONTENT_LANGUAGE", "English")
+
+
 def generate(title, notes, day_no, previous):
     key = os.getenv("GEMINI_API_KEY", "")
     if not key:
         raise RuntimeError("GEMINI_API_KEY is not set")
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    lang = os.getenv("CONTENT_LANGUAGE", "English")
+    model = get_model()
+    lang = get_language()
     prev = "\n---\n".join(p[:600] for p in previous if p) or "(none yet)"
     prompt = f"""You write YouTube metadata for one video that the channel re-posts daily.
 Video title: {title}
@@ -50,11 +73,11 @@ Earlier descriptions (say the same truthful things in clearly different wording)
 Write in {lang}. Return ONLY JSON: {{"description": "...", "tags": ["..."]}}
 Rules: description 80-180 words, natural and accurate to the title/notes, no invented claims, no links,
 end with exactly 3 relevant hashtags. 10-15 tags, each under 30 characters, no # symbol."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.9, "responseMimeType": "application/json"}}
     last = None
     for attempt in range(3):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         try:
             r = requests.post(url, headers={"x-goog-api-key": key}, json=body, timeout=60)
             if r.status_code == 200:
@@ -68,6 +91,9 @@ end with exactly 3 relevant hashtags. 10-15 tags, each under 30 characters, no #
                 if not desc:
                     raise ValueError("empty description")
                 return {"description": desc, "tags": tags}
+            if r.status_code == 404 and model != "gemini-3.8-flash":
+                model = "gemini-3.8-flash"
+                continue
             last = f"HTTP {r.status_code}: {r.text[:200]}"
         except (requests.RequestException, ValueError) as e:
             last = str(e)
