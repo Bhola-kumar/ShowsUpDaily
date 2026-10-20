@@ -14,8 +14,10 @@ A small Flask app that re-posts one video to your YouTube channel every day. Eac
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env        # fill it in
-OAUTHLIB_INSECURE_TRANSPORT=1 python app.py   # http://localhost:5000
+python app.py   # Waitress WSGI server at http://localhost:5000
 ```
+
+`python app.py` uses Waitress instead of Flask's development server. For local OAuth testing over plain HTTP, set `OAUTHLIB_INSECURE_TRANSPORT=1` in your environment before starting the app. Do not use this setting for a public deployment.
 
 ## Get the keys
 
