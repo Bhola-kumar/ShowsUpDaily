@@ -43,6 +43,10 @@ def post(path, **data):
 
 # auth
 assert c.get("/").status_code == 302
+assert c.get("/privacy-policy").status_code == 200
+assert "Google Gemini" in c.get("/privacy-policy").get_data(as_text=True)
+assert c.get("/terms-of-service").status_code == 200
+assert "Authorization and publishing" in c.get("/terms-of-service").get_data(as_text=True)
 r = c.post("/login", data={"csrf": csrf("/login"), "password": "pw"}, follow_redirects=True)
 assert "Daily Poster" in r.get_data(as_text=True)
 

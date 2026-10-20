@@ -26,7 +26,8 @@ OAUTHLIB_INSECURE_TRANSPORT=1 python app.py   # http://localhost:5000
 2. OAuth consent screen: User type External, add your Google account as a test user.
 3. Credentials → Create OAuth client ID → **Web application**. Add the authorized redirect URI `BASE_URL/oauth/callback` (for local: `http://localhost:5000/oauth/callback`).
 4. Copy the client ID and secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-5. **Important:** on the consent screen, click **Publish app** (move it from "Testing" to "In production"). In Testing mode Google expires the login after 7 days and daily posting stops. You'll see an "unverified app" warning when signing in, which is fine for your own account.
+5. Before publishing, deploy the app at a stable public HTTPS URL, set `BASE_URL` to that URL, and replace the contact placeholders in the legal pages with a real contact address. The public pages are `BASE_URL/privacy-policy` and `BASE_URL/terms-of-service`; they are accessible without signing in. Add these URLs to your OAuth consent-screen app details, along with the app homepage and any authorized domains Google requires.
+6. **Important:** on the consent screen, click **Publish app** (move it from "Testing" to "In production") when you're ready. In Testing mode Google expires the login after 7 days and daily posting stops. You'll see an "unverified app" warning when signing in, which is fine for your own account. Public release and verification requirements depend on the permissions and Google's current review process; these pages alone do not complete that process.
 
 ## Deploy on a free host & Persistent Storage
 

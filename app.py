@@ -224,6 +224,16 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.get("/privacy-policy")
+def privacy_policy():
+    return render_template("privacy_policy.html")
+
+
+@app.get("/terms-of-service")
+def terms_of_service():
+    return render_template("terms_of_service.html")
+
+
 # ---------------------------------------------------------------- dashboard
 def _next_run_label():
     if db.get("enabled", "1") != "1":

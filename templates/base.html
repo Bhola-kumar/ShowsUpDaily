@@ -569,6 +569,22 @@
   .row > div { flex: 1 1 180px; }
   .stack > * + * { margin-top: 14px; }
   form.inline { display: inline; }
+  .site-footer {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding-top: 20px;
+    margin-top: 30px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .site-footer a, .legal-content a { color: #93b4ff; }
+  .legal-content { max-width: 780px; margin: 0 auto; }
+  .legal-content h1 { font-size: 30px; margin: 0 0 4px; }
+  .legal-content h2 { font-size: 18px; margin: 24px 0 8px; }
+  .legal-content p, .legal-content li { color: var(--ink-muted); }
+  .legal-content ul { padding-left: 22px; }
 </style>
 </head>
 <body>
@@ -582,6 +598,10 @@
     {% endfor %}
   {% endwith %}
   {% block body %}{% endblock %}
+  <footer class="site-footer muted">
+    <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>
+    <a href="{{ url_for('terms_of_service') }}">Terms of Service</a>
+  </footer>
 </main>
 </body>
 </html>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service · ShowsUpDaily{% endblock %}
+{% block body %}
+<article class="card legal-content">
+  <h1>Terms of Service</h1>
+  <p class="muted">ShowsUpDaily · Last updated: October 20, 2026</p>
+
+  <p>These terms apply to your use of ShowsUpDaily (the “Application”), a tool for scheduling and publishing videos to YouTube. The Application is self-hosted; the person or organization operating your instance is the service provider (“Operator”). By using an instance, you agree to these terms.</p>
+
+  <h2>Your account and responsibilities</h2>
+  <ul>
+    <li>You are responsible for protecting the instance password and any account or credentials you use with it.</li>
+    <li>You must have the rights and permissions needed to upload, process, and publish your videos, titles, notes, and other content. You are responsible for your content and for the consequences of publishing it.</li>
+    <li>You must comply with applicable laws and the terms, policies, and rules of Google, YouTube, Gemini, and any hosting or storage provider you use.</li>
+    <li>You must not use the Application to violate others' rights, publish unlawful or harmful content, interfere with services, or bypass provider safeguards.</li>
+  </ul>
+
+  <h2>Authorization and publishing</h2>
+  <p>Connecting YouTube authorizes the Application to use the requested YouTube permissions on your behalf. You direct the Application to upload videos and metadata and may choose a visibility setting, but YouTube may apply its own restrictions or settings. You can disconnect the channel in the dashboard and revoke access through your Google Account. Content already uploaded remains subject to YouTube's controls and policies.</p>
+
+  <h2>Automation and third-party services</h2>
+  <p>Scheduled posting depends on the instance being available and correctly configured, as well as Google's, YouTube's, Gemini's, and any hosting or storage provider's services. The Operator does not guarantee a particular posting time, successful upload, metadata result, audience reach, or uninterrupted operation. Provider outages, quotas, policy decisions, app configuration, or network failures may delay or prevent a post. You remain responsible for checking your channel and reviewing published content.</p>
+
+  <h2>Your content and data</h2>
+  <p>You retain responsibility for the content you provide and publish. The Application processes and stores that content as described in its <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>. You are responsible for maintaining access to your instance and arranging any data export or deletion with its Operator.</p>
+
+  <h2>Availability and changes</h2>
+  <p>The Operator may modify, suspend, or discontinue an instance at any time. The Application is provided “as is” and “as available,” to the extent permitted by law. No warranty is made that it will be error-free, secure, or continuously available.</p>
+
+  <h2>Limitation of liability</h2>
+  <p>To the extent permitted by applicable law, the Operator is not liable for indirect, incidental, special, consequential, or punitive damages, loss of data, lost revenue, or content moderation or account actions taken by third-party providers. Nothing in these terms limits liability where it cannot legally be limited.</p>
+
+  <h2>Changes and contact</h2>
+  <p>These terms may be updated as the Application or its operation changes. Continued use after an update means you accept the revised terms. For questions, contact the instance Operator at <strong>[Add your support contact email]</strong>. Replace this placeholder with a monitored email address before publishing the Application.</p>
+</article>
+{% endblock %}

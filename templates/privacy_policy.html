@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy · ShowsUpDaily{% endblock %}
+{% block body %}
+<article class="card legal-content">
+  <h1>Privacy Policy</h1>
+  <p class="muted">ShowsUpDaily · Last updated: October 20, 2026</p>
+
+  <p>This policy explains how ShowsUpDaily (the “Application”) handles information when you use it to schedule and publish videos to your YouTube channel. The Application is a self-hosted tool; the person or organization that operates the particular instance is responsible for its data and configuration.</p>
+
+  <h2>Information the Application handles</h2>
+  <ul>
+    <li><strong>Videos and details you provide:</strong> uploaded video files, the original filename, title, notes, upload time, and file size.</li>
+    <li><strong>YouTube account information:</strong> when you connect YouTube, the Application stores the OAuth token Google provides, along with your channel name and channel ID. It requests YouTube upload and read-only access so it can identify your channel and publish videos.</li>
+    <li><strong>Settings and publishing records:</strong> posting schedule, visibility preference, automation status, posting dates, video IDs, generated descriptions and tags, and success or error messages.</li>
+    <li><strong>Login session information:</strong> the Application uses a signed session cookie to keep you signed in and protect requests. It does not use the cookie for advertising or cross-site tracking.</li>
+  </ul>
+
+  <h2>How information is used and shared</h2>
+  <p>The Application uses this information to store your videos and settings, generate video metadata, connect to your channel, and publish or record posts at your direction. It does not sell your personal information.</p>
+  <ul>
+    <li><strong>Google Gemini:</strong> if a Gemini API key is configured, the video title, notes, and a small selection of prior descriptions for that video are sent to Google's Gemini API to generate descriptions and tags. Do not include sensitive information in titles or notes. Google's use of submitted content is governed by Google's applicable terms and privacy disclosures.</li>
+    <li><strong>YouTube / Google:</strong> when you connect your account or publish, the Application exchanges OAuth information with Google and sends the video and associated metadata to YouTube. Google's terms and privacy policy apply to those services. You can revoke the Application's access in your Google Account.</li>
+    <li><strong>Supabase:</strong> if the instance operator configures Supabase, the Application stores its database records and video files there. Otherwise, those files and records are stored on the server's local disk. The instance operator chooses the hosting and storage providers.</li>
+    <li><strong>Hosting provider:</strong> requests pass through the service hosting the instance, which may process technical information such as IP address and request logs under its own policies.</li>
+  </ul>
+
+  <h2>Retention and deletion</h2>
+  <p>Information remains in the instance's configured storage until the operator deletes it. The dashboard can delete archived video files and their video records; existing publishing history may remain. Disconnecting YouTube removes the saved OAuth token and channel identifiers from the Application, but does not delete videos already published to YouTube or remove copies held by Google, the hosting provider, or backups. The instance operator can remove remaining data from the configured database and storage.</p>
+
+  <h2>Security</h2>
+  <p>The Application uses a password-protected dashboard, CSRF protection, and a signed session cookie. The instance operator is responsible for securing the server, app password, signing key, API keys, OAuth credentials, storage credentials, backups, and network access. No internet transmission or storage system can be guaranteed completely secure.</p>
+
+  <h2>Children and sensitive information</h2>
+  <p>The Application is a publishing tool, not a service designed for children. Do not upload information you are not authorized to process or share, or include sensitive personal information in video notes sent to Gemini.</p>
+
+  <h2>Changes and contact</h2>
+  <p>This policy may be updated when the Application or its data practices change. For privacy questions or requests, contact the instance operator at <strong>[Add your privacy contact email]</strong>. Replace this placeholder with a monitored email address before publishing the Application.</p>
+</article>
+{% endblock %}
