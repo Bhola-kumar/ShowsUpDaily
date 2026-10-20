@@ -234,6 +234,11 @@ def terms_of_service():
     return render_template("terms_of_service.html")
 
 
+@app.get("/")
+def home():
+    return render_template("home.html")
+
+
 # ---------------------------------------------------------------- dashboard
 def _next_run_label():
     if db.get("enabled", "1") != "1":
@@ -246,7 +251,7 @@ def _next_run_label():
     return f"Today {t}" if now() < due else "Due now"
 
 
-@app.get("/")
+@app.get("/dashboard")
 @login_required
 def index():
     v = active_video()

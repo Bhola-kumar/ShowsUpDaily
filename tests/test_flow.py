@@ -31,18 +31,21 @@ def next_day():
     db.delete("attempt_date")
 
 
-def csrf(path="/"):
+def csrf(path="/dashboard"):
     html = c.get(path).get_data(as_text=True)
     return re.search(r'name="csrf" value="([^"]+)"', html).group(1)
 
 
 def post(path, **data):
-    return c.post(path, data={"csrf": csrf("/login" if not data.pop("_authed", True) else "/"), **data},
+    return c.post(path, data={"csrf": csrf("/login" if not data.pop("_authed", True) else "/dashboard"), **data},
                   follow_redirects=True)
 
 
 # auth
-assert c.get("/").status_code == 302
+home = c.get("/")
+assert home.status_code == 200
+assert "A personal tool for scheduling daily video posts to YouTube." in home.get_data(as_text=True)
+assert c.get("/dashboard").status_code == 302
 assert c.get("/privacy-policy").status_code == 200
 assert "Google Gemini" in c.get("/privacy-policy").get_data(as_text=True)
 assert c.get("/terms-of-service").status_code == 200
@@ -52,26 +55,26 @@ assert "Daily Poster" in r.get_data(as_text=True)
 
 # upload video 1
 def upload(title):
-    return c.post("/upload", data={"csrf": csrf(), "title": title, "notes": "about x",
+    return c.post("/upload", data={"csrf": csrf("/dashboard"), "title": title, "notes": "about x",
                   "video": (io.BytesIO(b"\x00" * 2048), "a.mp4")}, content_type="multipart/form-data",
                   follow_redirects=True)
 assert "counter restarted" in upload("Video One").get_data(as_text=True)
-assert "Video One" in c.get("/").get_data(as_text=True)
+assert "Video One" in c.get("/dashboard").get_data(as_text=True)
 assert c.get("/video/1").status_code == 200
 
 # not connected -> tick idles
 assert A.tick() == "idle"
 db.put("google_token", "{}")
 db.put("channel_title", "My Channel")
-assert "My Channel" in c.get("/").get_data(as_text=True)
+assert "My Channel" in c.get("/dashboard").get_data(as_text=True)
 
 # schedule in the past so it is due; first tick posts
 db.put("post_time", "00:00")
 assert A.tick().startswith("Posted day 1"), A.tick()
 assert db.one("SELECT days_posted FROM videos WHERE id=1")["days_posted"] == 1
 assert A.tick() == "already posted today"
-assert "Day 1" in c.get("/").get_data(as_text=True)
-assert "forced to private" in c.get("/").get_data(as_text=True) or "YouTube set it to private" in c.get("/").get_data(as_text=True)
+assert "Day 1" in c.get("/dashboard").get_data(as_text=True)
+assert "forced to private" in c.get("/dashboard").get_data(as_text=True) or "YouTube set it to private" in c.get("/dashboard").get_data(as_text=True)
 
 # simulate next day twice -> counter 3, descriptions vary by day
 for expected in (2, 3):
@@ -103,7 +106,7 @@ assert A.tick() == "waiting before retry"
 db.put("last_attempt_ts", 0); assert A.tick().startswith("Failed")
 db.put("last_attempt_ts", 0); assert A.tick().startswith("Failed")
 db.put("last_attempt_ts", 0); assert A.tick() == "max attempts reached today"
-assert "quota" in c.get("/").get_data(as_text=True)
+assert "quota" in c.get("/dashboard").get_data(as_text=True)
 
 # settings + csrf + cron
 post("/settings", post_time="07:30", privacy="unlisted", enabled="on")
